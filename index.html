@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArchiveVision</title>
+    <link rel="icon" type="image/png" href="tv.png">
+    <style>
+        body {
+            font-family: Arial, Verdana, sans-serif;
+            background: #f5e8d3;
+            margin: 0;
+            padding: 20px 0;
+            color: #333;
+        }
+        #container {
+            width: 960px;
+            margin: 0 auto;
+            background: #fff;
+            border: 2px solid #e0c8a8;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        #header {
+            background: linear-gradient(45deg, #ff4d4d, #ff8c1a);
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #cc4c4c;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            border-radius: 8px 8px 0 0;
+        }
+        #header img.logo {
+            width: 100px;
+            height: auto;
+            margin-bottom: 15px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease;
+        }
+        #header img.logo:hover {
+            transform: scale(1.1);
+        }
+        #header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        #header p {
+            margin: 5px 0 0;
+            font-size: 16px;
+            font-style: italic;
+        }
+        #search-container {
+            padding: 20px;
+            background: #f9f1e0;
+            border-bottom: 2px solid #e0c8a8;
+            text-align: center;
+        }
+        #search {
+            width: 70%;
+            padding: 10px;
+            font-size: 16px;
+            border: 2px solid #d9b38c;
+            border-radius: 5px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+            transition: border-color 0.3s ease;
+        }
+        #search:focus {
+            border-color: #ff8c1a;
+            outline: none;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: linear-gradient(#ffebcd, #f4a460);
+            border: 2px solid #d2691e;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+        button:hover {
+            background: linear-gradient(#fff5e6, #ffa07a);
+            transform: translateY(-2px);
+        }
+        #results {
+            padding: 20px;
+        }
+        .video-item {
+            float: left;
+            width: 320px;
+            margin: 15px;
+            background: #fff;
+            border: 2px solid #e0c8a8;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+        .video-item:hover {
+            transform: translateY(-5px);
+        }
+        .embed {
+            width: 100%;
+            height: 180px;
+            background: #000;
+            opacity: 0;
+            animation: fadeInBounce 0.6s ease-out forwards;
+        }
+        @keyframes fadeInBounce {
+            0% { opacity: 0; transform: translateY(20px); }
+            50% { transform: translateY(-10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .title {
+            padding: 12px;
+            font-size: 15px;
+            color: #d2691e;
+            text-decoration: underline;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+        .title:hover {
+            color: #ff4500;
+        }
+        .clearfix::after {
+            content: "";
+            clear: both;
+            display: table;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">
+            <img src="tv.png" alt="ArchiveVision Logo" class="logo">
+            <h1>ArchiveVision: Relive YouTube in the Golden Era</h1>
+            <p>Discover videos from the Golden Era Of YouTube</p>
+        </div>
+        <div id="search-container">
+            <input type="text" id="search" placeholder="Search old videos (e.g., 'Minecraft')">
+            <button onclick="searchVideos()">Search</button>
+        </div>
+        <div id="results" class="clearfix"></div>
+    </div>
+
+    <script>
+        const API_KEY = 'AIzaSyBUrV51VYozfgGdYNo1XNBnF0cj15DS4XM';
+        const BASE_URL = 'https://www.googleapis.com/youtube/v3';
+        const BEFORE_DATE = '2015-01-01T00:00:00Z';
+        let lastSearchTerm = '';
+
+        async function searchVideos() {
+            const query = document.getElementById('search').value;
+            if (!query) return;
+            lastSearchTerm = query;
+
+            const params = new URLSearchParams({
+                part: 'snippet',
+                q: query,
+                type: 'video',
+                publishedBefore: BEFORE_DATE,
+                maxResults: 30, // Fetch more to account for skips
+                key: API_KEY
+            });
+
+            try {
+                const response = await fetch(`${BASE_URL}/search?${params}`);
+                const data = await response.json();
+                if (data.error) {
+                    alert('API Error: ' + data.error.message + ' - Check your key/quota.');
+                    return;
+                }
+                await displayResults(data.items);
+            } catch (error) {
+                console.error('Fetch Error:', error);
+                alert('Search failed—check your internet or API key.');
+            }
+        }
+
+        async function displayResults(items) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+
+            const videoIds = items.map(item => item.id.videoId).join(',');
+
+            try {
+                const statusResponse = await fetch(`${BASE_URL}/videos?part=status,snippet&id=${videoIds}&key=${API_KEY}`);
+                const statusData = await statusResponse.json();
+                if (statusData.error) {
+                    console.error('Status API Error:', statusData.error);
+                    return;
+                }
+
+                const validItems = [];
+                items.forEach(item => {
+                    const videoStatus = statusData.items.find(v => v.id === item.id.videoId);
+                    if (videoStatus && videoStatus.status.embeddable && videoStatus.status.privacyStatus === 'public') {
+                        validItems.push(item);
+                    } else {
+                        console.warn(`Skipping unavailable video: ${item.id.videoId}`);
+                    }
+                });
+
+                // Display up to 12 valid items
+                validItems.slice(0, 12).forEach(item => {
+                    const videoId = item.id.videoId;
+                    const title = item.snippet.title;
+
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'video-item';
+                    itemDiv.innerHTML = `
+                        <div class="embed">
+                            <iframe width="100%" height="100%" 
+                                src="https://www.youtube-nocookie.com/embed/${videoId}?playsinline=1" 
+                                title="YouTube video player" 
+                                frameborder="0" 
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                referrerpolicy="strict-origin-when-cross-origin" 
+                                allowfullscreen loading="lazy"></iframe>
+                        </div>
+                        <h3 class="title" onclick="window.location.href='watch.html?videoId=${videoId}&searchTerm=${encodeURIComponent(lastSearchTerm)}'">${title}</h3>
+                    `;
+                    resultsDiv.appendChild(itemDiv);
+                    setTimeout(() => itemDiv.querySelector('.embed').style.animationPlayState = 'running', 50);
+                });
+
+                if (validItems.length < 12) {
+                    console.log('Fetched fewer than 12 valid videos.');
+                }
+            } catch (error) {
+                console.error('Status Fetch Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
